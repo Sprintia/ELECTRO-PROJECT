@@ -45,3 +45,6 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 ## V6 — Fix elec + table pas ISO
 - Électrique: boutons Calculer remplissent aussi les champs U/I/R/P et P/I
 - Mécanique: pas ISO en tableau avec filtre
+
+## V6.2 — Fix IndexedDB upgrade
+- onupgradeneeded rendu idempotent (création stores/index seulement si absent)

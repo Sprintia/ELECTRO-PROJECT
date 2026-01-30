@@ -1,6 +1,6 @@
 // IndexedDB wrapper — Electro Terrain V1
 const DB_NAME = "electroTerrain";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 function uid(prefix="id"){
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
@@ -17,37 +17,44 @@ class DB {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       // If an old tab/app keeps the DB open, upgrades can be blocked on iOS.
       req.onblocked = () => reject(new Error("Base locale bloquée (mise à jour). Ferme les autres onglets/PWA ElectroTerrain puis relance."));
-      req.onupgradeneeded = () => {
-        const db = req.result;
-
-        const nodes = db.createObjectStore("nodes", { keyPath: "id" });
-        nodes.createIndex("by_parent", "parentId", { unique: false });
-        nodes.createIndex("by_type", "type", { unique: false });
-
-        const interventions = db.createObjectStore("interventions", { keyPath: "id" });
-        interventions.createIndex("by_node", "nodeId", { unique: false });
-        interventions.createIndex("by_date", "createdAt", { unique: false });
-
-        const checklists = db.createObjectStore("checklists", { keyPath: "id" });
-        checklists.createIndex("by_scope", "scope", { unique: false });
-        checklists.createIndex("by_node", "nodeId", { unique: false });
-
-        // Mechanical: bearings database (editable)
-        const bearings = db.createObjectStore("bearings", { keyPath: "id" });
-        bearings.createIndex("by_ref", "ref", { unique: false });
-
-        // Automation: faults database (editable)
-        const faults = db.createObjectStore("faults", { keyPath: "id" });
-        faults.createIndex("by_vendor", "vendor", { unique: false });
-        faults.createIndex("by_product", "product", { unique: false });
-        faults.createIndex("by_code", "code", { unique: false });
-
-
-        checklists.createIndex("by_scope", "scope", { unique: false });
-        checklists.createIndex("by_node", "nodeId", { unique: false });
-
-        const settings = db.createObjectStore("settings", { keyPath: "key" });
+      req.onupgradeneeded = (e) => {
+      const db = req.result;
+      const tx = req.transaction;
+      // Create stores only if missing (safe across versions)
+      const ensureStore = (name, options) => {
+        if (!db.objectStoreNames.contains(name)) {
+          return db.createObjectStore(name, options);
+        }
+        return tx.objectStore(name);
       };
+      const ensureIndex = (store, indexName, keyPath, options) => {
+        if (!store.indexNames.contains(indexName)) {
+          store.createIndex(indexName, keyPath, options);
+        }
+      };
+
+      const nodes = ensureStore("nodes", { keyPath: "id" });
+      ensureIndex(nodes, "by_parent", "parentId", { unique: false });
+      ensureIndex(nodes, "by_type", "type", { unique: false });
+
+      const interventions = ensureStore("interventions", { keyPath: "id" });
+      ensureIndex(interventions, "by_node", "nodeId", { unique: false });
+      ensureIndex(interventions, "by_date", "createdAt", { unique: false });
+
+      const checklists = ensureStore("checklists", { keyPath: "id" });
+      ensureIndex(checklists, "by_scope", "scope", { unique: false });
+      ensureIndex(checklists, "by_node", "nodeId", { unique: false });
+
+      const bearings = ensureStore("bearings", { keyPath: "id" });
+      ensureIndex(bearings, "by_ref", "ref", { unique: false });
+
+      const faults = ensureStore("faults", { keyPath: "id" });
+      ensureIndex(faults, "by_vendor", "vendor", { unique: false });
+      ensureIndex(faults, "by_product", "product", { unique: false });
+      ensureIndex(faults, "by_code", "code", { unique: false });
+
+      const settings = ensureStore("settings", { keyPath: "key" });
+    };
       req.onsuccess = () => {
         const db = req.result;
         // Auto-close on version change to avoid blocking future upgrades.
