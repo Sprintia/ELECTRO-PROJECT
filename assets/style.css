@@ -216,3 +216,10 @@ label{display:block; margin: 10px 0 6px; color:var(--muted); font-size:12px}
 @media (max-width:420px){
   .grid{grid-template-columns:1fr}
 }
+
+
+/* Debug banner */
+.errBanner{position:fixed;left:12px;right:12px;bottom:74px;z-index:9999;background:#111;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none}
+.errBanner .title{font-weight:700;margin-bottom:6px}
+.errBanner pre{white-space:pre-wrap;font-size:12px;opacity:.9;margin:0;max-height:140px;overflow:auto}
+.errBanner .btnrow{display:flex;gap:8px;margin-top:10px}

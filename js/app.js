@@ -13,6 +13,27 @@ const view = document.getElementById("view");
 const backBtn = document.getElementById("backBtn");
 const syncBtn = document.getElementById("syncBtn");
 
+// --- Global error catcher (debug) ---
+function showErr(err){
+  const banner = document.getElementById("errBanner");
+  const txt = document.getElementById("errText");
+  if (!banner || !txt) return;
+  const msg = (err && err.stack) ? err.stack : String(err);
+  txt.textContent = msg;
+  banner.style.display = "block";
+}
+window.addEventListener("error", (e)=>{ showErr(e.error || e.message || e); });
+window.addEventListener("unhandledrejection", (e)=>{ showErr(e.reason || e); });
+
+const errClose = document.getElementById("errClose");
+if (errClose) errClose.onclick = ()=>{ document.getElementById("errBanner").style.display="none"; };
+const errCopy = document.getElementById("errCopy");
+if (errCopy) errCopy.onclick = async ()=>{
+  const t = document.getElementById("errText")?.textContent || "";
+  try { await navigator.clipboard.writeText(t); } catch {}
+};
+
+
 function setActiveNav(hash){
   document.querySelectorAll(".navbtn").forEach(b=>{
     const route = b.getAttribute("data-route");
