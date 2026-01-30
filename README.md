@@ -15,3 +15,10 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 ## Déploiement GitHub Pages
 - Settings → Pages
 - Branch: `main` ; Folder: `/ (root)`
+
+
+## V2 — Électrique
+- Convertisseurs
+- Loi d'Ohm & puissance
+- Mono/Tri (P/I)
+- Chute de tension + section (mode rapide)
