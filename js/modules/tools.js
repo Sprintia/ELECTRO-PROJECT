@@ -1,13 +1,17 @@
 import { ui } from "../ui.js";
 
 /**
- * ELECTRIQUE — V2 (terrain-first)
+ * ELECTRIQUE — V3 (terrain-first)
  * - Convertisseurs
  * - Loi d'Ohm & Puissance
  * - Mono / Tri (P, I)
  * - Chute de tension (Cu/Al) + section conseillée (mode rapide)
+ * - Courant moteur (kW → A) avec cosφ + rendement
+ * - Aide sélection protections (disjoncteur / fusibles) — mode terrain
  *
- * Note: dimensionnement "rapide terrain" — pour une validation normative, utiliser tableaux/logiciels selon NF C 15-100 et conditions de pose.
+ * ⚠️ IMPORTANT
+ * Ces outils sont pensés "terrain" (estimation). Pour dimensionnement normatif :
+ * NF C 15-100, IEC 60364, données constructeur, conditions de pose, Ik, sélectivité, etc.
  */
 
 function num(x){
@@ -16,16 +20,13 @@ function num(x){
 }
 function fmt(x, digits=2){
   if (!Number.isFinite(x)) return "—";
-  // Trim trailing zeros
   const s = x.toFixed(digits);
   return s.replace(/\.?0+$/,"");
 }
-
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
 function sectionFromCurrentSimple(I){
   // Heuristic for Cu in common industrial conditions (not normative).
-  // Returns mm²
   if (!Number.isFinite(I) || I <= 0) return null;
   const table = [
     {I:10, s:1.5},
@@ -55,29 +56,46 @@ function resistivity(material){
   return 0.0175; // copper
 }
 
-function vdrop({system, I, L, S, U, cosphi, material}){
+function vdrop({system, I, L, S, U, material}){
   // Simplified voltage drop:
-  // single-phase: ΔU = 2 * ρ * L * I / S
-  // three-phase:  ΔU = √3 * ρ * L * I / S
-  // reactive component ignored (X) for simplicity (terrain quick)
+  // mono: ΔU = 2 * ρ * L * I / S
+  // tri : ΔU = √3 * ρ * L * I / S
   const rho = resistivity(material);
   if (![I,L,S,U].every(Number.isFinite)) return null;
   if (I<=0 || L<=0 || S<=0 || U<=0) return null;
   const k = (system === "tri") ? Math.sqrt(3) : 2;
-  const du = k * rho * L * I / S; // volts
+  const du = k * rho * L * I / S;
   const pct = (du / U) * 100;
   return { du, pct };
 }
 
+function motorCurrent({sys, U, kW, cosphi, eta}){
+  // Electrical input power Pe = Pm / eta (Pm = mechanical output)
+  // Mono: Pe = U*I*cosφ
+  // Tri : Pe = √3*U*I*cosφ
+  if (![U,kW,cosphi,eta].every(Number.isFinite)) return null;
+  if (U<=0 || kW<=0 || cosphi<=0 || eta<=0) return null;
+  const Pe = (kW*1000) / eta;
+  const k = (sys === "tri") ? Math.sqrt(3) : 1;
+  const I = Pe / (k * U * cosphi);
+  return { I, Pe };
+}
+
+function pickStandard(over){
+  const std = [2,3,4,6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400];
+  for (const s of std){ if (over <= s) return s; }
+  return std[std.length-1];
+}
+
 export async function renderTools(){
-  ui.setTitle("Outils", "Électrique V2 • Terrain");
+  ui.setTitle("Outils", "Électrique V3 • Terrain");
 
   const el = document.getElementById("view");
   el.innerHTML = `
     <div class="grid">
       <button class="bigbtn" id="goElec">
-        <span class="left"><span style="font-size:20px">⚡</span><span><b>Électrique</b><div class="small">Convertisseurs • Ohm • Mono/Tri • Chute de tension</div></span></span>
-        <span class="pill">V2</span>
+        <span class="left"><span style="font-size:20px">⚡</span><span><b>Électrique</b><div class="small">Convertisseurs • Ohm • Mono/Tri • Moteur • Protections</div></span></span>
+        <span class="pill">V3</span>
       </button>
 
       <div class="card flat">
@@ -234,7 +252,7 @@ export async function renderTools(){
             <div>
               <label>Chute max (%)</label>
               <select id="d_max">
-                <option value="3" selected>3 % (recommandé)</option>
+                <option value="3" selected>3 %</option>
                 <option value="5">5 %</option>
                 <option value="8">8 %</option>
               </select>
@@ -252,7 +270,83 @@ export async function renderTools(){
             <div class="meta" id="d_out">—</div>
           </div>
           <div class="small" style="margin-top:8px">
-            ⚠️ Mode rapide : réactance (X), température, mode de pose, regroupement non pris en compte.
+            ⚠️ Formule simplifiée (sans X, sans corrections).
+          </div>
+        </div>
+
+        <div class="card flat">
+          <h3>Courant moteur (kW → A)</h3>
+          <label>Système</label>
+          <select id="m_sys">
+            <option value="tri" selected>Triphasé</option>
+            <option value="mono">Monophasé</option>
+          </select>
+
+          <div class="form2">
+            <div>
+              <label>Puissance moteur (kW)</label>
+              <input id="m_kw" placeholder="Ex: 7.5" inputmode="decimal">
+            </div>
+            <div>
+              <label>U (V)</label>
+              <input id="m_u" placeholder="Ex: 400" inputmode="decimal" value="400">
+            </div>
+          </div>
+
+          <div class="form2">
+            <div>
+              <label>cosφ</label>
+              <input id="m_cos" placeholder="Ex: 0.85" inputmode="decimal" value="0.85">
+            </div>
+            <div>
+              <label>Rendement η</label>
+              <input id="m_eta" placeholder="Ex: 0.9" inputmode="decimal" value="0.9">
+            </div>
+          </div>
+
+          <div class="sep"></div>
+          <button class="btn primary" id="m_calc">Calculer</button>
+          <div class="sep"></div>
+          <div class="item">
+            <div class="meta" id="m_out">—</div>
+          </div>
+          <div class="small" style="margin-top:8px">
+            Astuce: si tu n’as pas η, mets 0,9. Si tu n’as pas cosφ, mets 0,85.
+          </div>
+        </div>
+
+        <div class="card flat">
+          <h3>Aide protections (disjoncteur / fusibles)</h3>
+          <label>Courant nominal In (A)</label>
+          <input id="prot_i" placeholder="Ex: 14.2" inputmode="decimal">
+
+          <div class="form2">
+            <div>
+              <label>Type de charge</label>
+              <select id="prot_load">
+                <option value="general" selected>Général (prises / ligne / chauffage)</option>
+                <option value="motor">Moteur (démarrage)</option>
+              </select>
+            </div>
+            <div>
+              <label>Marge</label>
+              <select id="prot_margin">
+                <option value="1.15" selected>+15%</option>
+                <option value="1.25">+25%</option>
+                <option value="1.40">+40%</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="sep"></div>
+          <button class="btn primary" id="prot_calc">Proposer</button>
+          <div class="sep"></div>
+          <div class="item">
+            <div class="meta" id="prot_out">—</div>
+          </div>
+
+          <div class="small" style="margin-top:8px">
+            ⚠️ Aide terrain: ne remplace pas l’étude (Ik, sélectivité, courbe, section, mode de pose).
           </div>
         </div>
       </div>
@@ -284,7 +378,6 @@ export async function renderTools(){
       out1 = `${fmt(v/1000,3)} kW`;
       out2 = `${fmt(v,0)} W`;
     } else if (type === "kw_cv"){
-      // 1 kW ≈ 1.35962 CV (metric horsepower)
       out1 = `${fmt(v*1.35962,2)} CV`;
       out2 = `${fmt(v,3)} kW`;
     } else if (type === "a_ma"){
@@ -313,43 +406,28 @@ export async function renderTools(){
     const R = num(el.querySelector("#o_r").value);
     const P = num(el.querySelector("#o_p").value);
 
-    // Count known
-    const known = [
-      Number.isFinite(U),
-      Number.isFinite(I),
-      Number.isFinite(R),
-      Number.isFinite(P)
-    ].filter(Boolean).length;
-
+    const known = [U,I,R,P].filter(Number.isFinite).length;
     if (known < 2){
       ui.toast("Remplis au moins 2 champs.");
       return;
     }
 
     let u=U, i=I, r=R, p=P;
-
-    // Simple solve loop
-    for (let iter=0; iter<8; iter++){
+    for (let iter=0; iter<10; iter++){
       if (!Number.isFinite(u) && Number.isFinite(i) && Number.isFinite(r)) u = i*r;
-      if (!Number.isFinite(i) && Number.isFinite(u) && Number.isFinite(r)) i = u/r;
-      if (!Number.isFinite(r) && Number.isFinite(u) && Number.isFinite(i)) r = u/i;
+      if (!Number.isFinite(i) && Number.isFinite(u) && Number.isFinite(r) && r!==0) i = u/r;
+      if (!Number.isFinite(r) && Number.isFinite(u) && Number.isFinite(i) && i!==0) r = u/i;
 
       if (!Number.isFinite(p) && Number.isFinite(u) && Number.isFinite(i)) p = u*i;
       if (!Number.isFinite(p) && Number.isFinite(i) && Number.isFinite(r)) p = r*i*i;
-      if (!Number.isFinite(p) && Number.isFinite(u) && Number.isFinite(r)) p = (u*u)/r;
+      if (!Number.isFinite(p) && Number.isFinite(u) && Number.isFinite(r) && r!==0) p = (u*u)/r;
 
       if (!Number.isFinite(u) && Number.isFinite(p) && Number.isFinite(i) && i!==0) u = p/i;
       if (!Number.isFinite(i) && Number.isFinite(p) && Number.isFinite(u) && u!==0) i = p/u;
       if (!Number.isFinite(r) && Number.isFinite(u) && Number.isFinite(p) && p!==0) r = (u*u)/p;
       if (!Number.isFinite(r) && Number.isFinite(p) && Number.isFinite(i) && i!==0) r = p/(i*i);
 
-      // Stop if all known
       if ([u,i,r,p].every(Number.isFinite)) break;
-    }
-
-    if (![u,i,r,p].some(Number.isFinite)){
-      ui.toast("Impossible avec ces valeurs.");
-      return;
     }
 
     el.querySelector("#o_out").innerHTML =
@@ -380,9 +458,7 @@ export async function renderTools(){
       i = (pkw*1000) / (k*U*cos);
     } else if (Number.isFinite(i) && i>0 && !Number.isFinite(pkw)){
       pkw = (k*U*i*cos)/1000;
-    } else if (Number.isFinite(i) && Number.isFinite(pkw)){
-      // both entered: just compute check
-    } else {
+    } else if (!Number.isFinite(i) && !Number.isFinite(pkw)){
       ui.toast("Remplis soit P(kW), soit I(A).");
       return;
     }
@@ -393,11 +469,11 @@ export async function renderTools(){
 
   // Voltage drop + section
   el.querySelector("#d_calc").onclick = ()=>{
-    const sys = el.querySelector("#d_sys").value; // mono/tri
+    const sys = el.querySelector("#d_sys").value;
     const U = num(el.querySelector("#d_u").value);
     const L = num(el.querySelector("#d_l").value);
     const I = num(el.querySelector("#d_i").value);
-    const mat = el.querySelector("#d_mat").value; // cu/al
+    const mat = el.querySelector("#d_mat").value;
     const maxPct = num(el.querySelector("#d_max").value);
     const Suser = num(el.querySelector("#d_s").value);
 
@@ -406,38 +482,26 @@ export async function renderTools(){
       return;
     }
 
-    // Start with user section if any, else pick by current
-    let S = Number.isFinite(Suser) && Suser>0 ? Suser : sectionFromCurrentSimple(I);
-
-    // iterate to satisfy maxPct using simplified formula
-    let result = vdrop({system: sys, I, L, S, U, cosphi: 1, material: mat});
+    let S = (Number.isFinite(Suser) && Suser>0) ? Suser : sectionFromCurrentSimple(I);
+    let result = vdrop({system: sys, I, L, S, U, material: mat});
     if (!result){
       ui.toast("Calcul impossible.");
       return;
     }
+
     const standard = [1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240];
     let chosen = S;
+
     if (result.pct > maxPct){
       for (const s of standard){
-        const r = vdrop({system: sys, I, L, S: s, U, cosphi: 1, material: mat});
+        const r = vdrop({system: sys, I, L, S: s, U, material: mat});
         if (r && r.pct <= maxPct){
-          chosen = s;
-          result = r;
-          break;
+          chosen = s; result = r; break;
         }
       }
-    } else {
-      // if user didn't specify, round up to standard >= current S
-      if (!(Number.isFinite(Suser) && Suser>0)){
-        for (const s of standard){
-          if (s >= S){
-            chosen = s;
-            result = vdrop({system: sys, I, L, S: chosen, U, cosphi:1, material: mat});
-            break;
-          }
-        }
-      } else {
-        chosen = S;
+    } else if (!(Number.isFinite(Suser) && Suser>0)){
+      for (const s of standard){
+        if (s >= S){ chosen = s; result = vdrop({system: sys, I, L, S: chosen, U, material: mat}); break; }
       }
     }
 
@@ -448,7 +512,75 @@ export async function renderTools(){
       ${badge}<br>
       <b>Section conseillée</b> : ${fmt(chosen,1)} mm² (${mat.toUpperCase()})<br>
       <b>Chute</b> : ${fmt(result.du,2)} V soit <b>${fmt(result.pct,2)} %</b> (max ${fmt(maxPct,0)}%)<br>
-      <span class="small">Hypothèse: formule simplifiée (ρ constant, sans X). Longueur = aller (mono utilise 2×L).</span>
+      <span class="small">Hypothèse: formule simplifiée (ρ constant). Longueur = aller.</span>
+    `;
+  };
+
+  // Motor current
+  el.querySelector("#m_calc").onclick = ()=>{
+    const sys = el.querySelector("#m_sys").value;
+    const kW = num(el.querySelector("#m_kw").value);
+    const U = num(el.querySelector("#m_u").value);
+    const cos = clamp(num(el.querySelector("#m_cos").value), 0, 1);
+    const eta = clamp(num(el.querySelector("#m_eta").value), 0, 1);
+
+    if (![kW,U,cos,eta].every(Number.isFinite) || kW<=0 || U<=0 || cos<=0 || eta<=0){
+      ui.toast("Vérifie kW, U, cosφ et η.");
+      return;
+    }
+
+    const r = motorCurrent({sys, U, kW, cosphi: cos, eta});
+    if (!r || !Number.isFinite(r.I)){
+      ui.toast("Calcul impossible.");
+      return;
+    }
+
+    el.querySelector("#m_out").innerHTML = `
+      <b>${sys==="tri"?"Tri":"Mono"}</b> • Pm=${fmt(kW,3)} kW • U=${fmt(U,1)} V • cosφ=${fmt(cos,2)} • η=${fmt(eta,2)}<br>
+      ⇒ <b>I ≈ ${fmt(r.I,2)} A</b> (Pe≈${fmt(r.Pe,0)} W)
+    `;
+  };
+
+  // Protection helper
+  el.querySelector("#prot_calc").onclick = ()=>{
+    const In = num(el.querySelector("#prot_i").value);
+    const load = el.querySelector("#prot_load").value;
+    const margin = num(el.querySelector("#prot_margin").value);
+
+    if (!Number.isFinite(In) || In<=0){
+      ui.toast("Entre un courant nominal In valide.");
+      return;
+    }
+
+    // Base: apply margin to choose device rating
+    const Iref = In * (Number.isFinite(margin) ? margin : 1.25);
+    const suggested = pickStandard(Iref);
+
+    // Guidance text
+    let advice = "";
+    if (load === "general"){
+      advice = `
+        <b>Disjoncteur (général)</b> : calibre ≥ ${fmt(suggested,0)} A<br>
+        <span class="small">À affiner selon section, mode de pose, longueur, température, sélectivité.</span>
+      `;
+    } else {
+      // motor: encourage motor-protection breaker/MPCB or D-curve, and fuses aM
+      const mp = pickStandard(In * 1.10);
+      const fuse = pickStandard(In * 1.60);
+      advice = `
+        <b>Moteur</b> :<br>
+        • Si disjoncteur moteur (MPCB) : réglage thermique ≈ ${fmt(In,2)} A (plaque) — calibre proche ${fmt(mp,0)} A<br>
+        • Si disjoncteur “ligne” : souvent courbe adaptée au démarrage (ex: D / C selon cas) — calibre indicatif ${fmt(suggested,0)} A<br>
+        • Fusibles : <b>aM</b> souvent ≈ 1,6×In → ~${fmt(fuse,0)} A (indicatif) + relais thermique (si aM).<br>
+        <span class="small">Toujours vérifier courant de démarrage, temps de démarrage, Ik et sélectivité.</span>
+      `;
+    }
+
+    el.querySelector("#prot_out").innerHTML = `
+      <b>Entrée</b> : In=${fmt(In,2)} A • marge=${fmt(margin*100-100,0)}% → Iref≈${fmt(Iref,2)} A<br>
+      <b>Proposition standard</b> : ${fmt(suggested,0)} A<br>
+      <div class="sep"></div>
+      ${advice}
     `;
   };
 }

@@ -22,3 +22,7 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 - Loi d'Ohm & puissance
 - Mono/Tri (P/I)
 - Chute de tension + section (mode rapide)
+
+## V3 — Moteur & Protections
+- Courant moteur (kW → A) avec cosφ + rendement
+- Aide sélection disjoncteur / fusibles (mode terrain)
