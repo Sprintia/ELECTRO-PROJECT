@@ -26,3 +26,6 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 ## V3 — Moteur & Protections
 - Courant moteur (kW → A) avec cosφ + rendement
 - Aide sélection disjoncteur / fusibles (mode terrain)
+
+## V3.1 — UX outils
+- Électrique: choix de l’outil avant affichage (menu)
