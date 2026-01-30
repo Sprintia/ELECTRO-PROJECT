@@ -85,6 +85,8 @@ function showSection(rootEl, group, id){
 }
 
 export async function renderTools(){
+  // FIX V4.1: ensure DOM is fully ready before wiring
+
   ui.setTitle("Outils", "Électrique + Mécanique");
 
   const el = document.getElementById("view");
