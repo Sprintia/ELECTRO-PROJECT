@@ -1,5 +1,5 @@
 // Electro Terrain — Service Worker (offline shell)
-const CACHE = "electro-terrain-v4-1-fix";
+const CACHE = "electro-terrain-v5-auto";
 const ASSETS = [
   "./",
   "./index.html",

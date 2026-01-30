@@ -101,6 +101,11 @@ export async function renderTools(){
         <span class="left"><span style="font-size:20px">🛠️</span><span><b>Mécanique</b><div class="small">Pas ISO • Roulements • Conversions</div></span></span>
         <span class="pill">V4</span>
       </button>
+
+      <button class="bigbtn" id="goAuto">
+        <span class="left"><span style="font-size:20px">🤖</span><span><b>Automatisme</b><div class="small">PLC Siemens • Variateurs SEW • Base défauts</div></span></span>
+        <span class="pill">V5</span>
+      </button>
     </div>
 
     <div class="sep"></div>
@@ -318,26 +323,115 @@ export async function renderTools(){
           <div class="small" style="margin-top:8px">1 daN·m = 10 N·m</div>
         </div>
       </div>
+
+
+    <!-- AUTO PANEL -->
+    <div id="autoPanel" class="card flat" style="display:none">
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <h3 style="margin:0">🤖 Automatisme</h3>
+        <span class="pill">offline</span>
+      </div>
+      <div class="sep"></div>
+
+      <div class="row" style="gap:10px; flex-wrap:wrap">
+        <button class="navbtn" style="flex:1; min-width:170px" data-auto-pick="plc">
+          <span class="navicon">🧠</span><span class="navtxt">PLC Siemens</span>
+        </button>
+        <button class="navbtn" style="flex:1; min-width:170px" data-auto-pick="sew">
+          <span class="navicon">⚙️</span><span class="navtxt">Variateurs SEW</span>
+        </button>
+        <button class="navbtn" style="flex:1; min-width:170px" data-auto-pick="memo">
+          <span class="navicon">📌</span><span class="navtxt">Mémo</span>
+        </button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div data-auto-section="plc" style="display:none">
+        <div class="card flat">
+          <h3>Base défauts — PLC Siemens</h3>
+          <div class="small">Recherche par code (BF/SF…), mot-clé, ou symptômes.</div>
+          <label>Recherche</label>
+          <input id="a_plc_q" placeholder="Ex: BF, SF, profinet, ET200…" />
+          <div class="sep"></div>
+          <div class="btnrow">
+            <button class="btn primary" id="a_plc_add">➕ Ajouter</button>
+            <button class="btn" id="a_plc_reload">↻ Rafraîchir</button>
+          </div>
+          <div class="sep"></div>
+          <div id="a_plc_list" class="list"></div>
+        </div>
+      </div>
+
+      <div data-auto-section="sew" style="display:none">
+        <div class="card flat">
+          <h3>Base défauts — Variateurs SEW</h3>
+          <div class="small">Ajoute tes codes SEW (Fxx, Axx…) au fur et à mesure.</div>
+          <label>Recherche</label>
+          <input id="a_sew_q" placeholder="Ex: Fxx, overcurrent, encoder…" />
+          <div class="sep"></div>
+          <div class="btnrow">
+            <button class="btn primary" id="a_sew_add">➕ Ajouter</button>
+            <button class="btn" id="a_sew_reload">↻ Rafraîchir</button>
+          </div>
+          <div class="sep"></div>
+          <div id="a_sew_list" class="list"></div>
+        </div>
+      </div>
+
+      <div data-auto-section="memo" style="display:none">
+        <div class="card flat">
+          <h3>Mémo (terrain)</h3>
+          <div class="item">
+            <div class="name">BF vs SF (Siemens)</div>
+            <div class="meta">
+              <b>BF</b> = défaut de communication (bus).<br>
+              <b>SF</b> = défaut système/module/config.<br>
+              Astuce: toujours lire le <b>buffer de diagnostic</b> et les diag des modules (ET200/IM).
+            </div>
+          </div>
+          <div class="item">
+            <div class="name">PROFINET — checks rapides</div>
+            <div class="meta">Nom d’équipement, adresse IP, switch, câble, alimentation 24V, ports, topo.</div>
+          </div>
+          <div class="item">
+            <div class="name">SEW — checks rapides</div>
+            <div class="meta">Alim réseau, 24V commande, moteur/thermique, frein, retour codeur, paramètres, I/O, bus (si option).</div>
+          </div>
+          <div class="small" style="margin-top:8px">Tu peux enrichir via les entrées défauts + notes perso.</div>
+        </div>
+      </div>
+    </div>
+
     </div>
   `;
 
   // Toggle panels
   const elecPanel = el.querySelector("#elecPanel");
   const mecaPanel = el.querySelector("#mecaPanel");
+  const autoPanel = el.querySelector("#autoPanel");
 
   el.querySelector("#goElec").onclick = () => {
     elecPanel.style.display = (elecPanel.style.display === "none") ? "block" : "none";
-    if (elecPanel.style.display === "block") mecaPanel.style.display = "none";
+    if (elecPanel.style.display === "block") { mecaPanel.style.display = "none"; autoPanel.style.display = "none"; }
     elecPanel.scrollIntoView({behavior:"smooth", block:"start"});
     showSection(el, "elec", "conv");
   };
 
   el.querySelector("#goMeca").onclick = () => {
     mecaPanel.style.display = (mecaPanel.style.display === "none") ? "block" : "none";
-    if (mecaPanel.style.display === "block") elecPanel.style.display = "none";
+    if (mecaPanel.style.display === "block") { elecPanel.style.display = "none"; autoPanel.style.display = "none"; }
     mecaPanel.scrollIntoView({behavior:"smooth", block:"start"});
     showSection(el, "meca", "thread");
-    await wireMeca(); // ensure wired after open
+    await wireMeca();
+  };
+
+  el.querySelector("#goAuto").onclick = async () => {
+    autoPanel.style.display = (autoPanel.style.display === "none") ? "block" : "none";
+    if (autoPanel.style.display === "block") { elecPanel.style.display = "none"; mecaPanel.style.display = "none"; }
+    autoPanel.scrollIntoView({behavior:"smooth", block:"start"});
+    showSection(el, "auto", "plc");
+    await wireAuto();
   };
 
   // Picker buttons
@@ -352,6 +446,14 @@ export async function renderTools(){
       showSection(el, "meca", btn.dataset.mecaPick);
       el.querySelector(`[data-meca-section="${btn.dataset.mecaPick}"]`)?.scrollIntoView({behavior:"smooth", block:"start"});
       await wireMeca();
+    };
+  });
+
+  el.querySelectorAll("[data-auto-pick]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      showSection(el, "auto", btn.dataset.autoPick);
+      el.querySelector(`[data-auto-section="${btn.dataset.autoPick}"]`)?.scrollIntoView({behavior:"smooth", block:"start"});
+      await wireAuto();
     };
   });
 
@@ -487,7 +589,125 @@ export async function renderTools(){
   };
 
   // ---------- MECA WIRING (idempotent) ----------
-  async function wireMeca(){
+  
+  // ---------- AUTO WIRING (idempotent) ----------
+  async function wireAuto(){
+    // PLC Siemens list
+    const plcQ = el.querySelector("#a_plc_q");
+    const plcList = el.querySelector("#a_plc_list");
+    if (plcQ && !plcQ.dataset.wired){
+      plcQ.dataset.wired = "1";
+
+      const renderPLC = async ()=>{
+        const items = await db.faultsSearch(plcQ.value, { vendor: "Siemens", product: "PLC (Step7/TIA)" });
+        plcList.innerHTML = items.length ? items.map(f=>faultCard(f)).join("") : `<div class="small">Aucun résultat. Ajoute un défaut avec ➕.</div>`;
+        wireFaultActions(plcList, renderPLC);
+      };
+
+      el.querySelector("#a_plc_reload").onclick = ()=> renderPLC();
+      plcQ.addEventListener("input", ()=> renderPLC());
+
+      el.querySelector("#a_plc_add").onclick = async ()=>{
+        await addFaultFlow({ vendor:"Siemens", product:"PLC (Step7/TIA)" });
+        await renderPLC();
+      };
+
+      await renderPLC();
+    }
+
+    // SEW drives list
+    const sewQ = el.querySelector("#a_sew_q");
+    const sewList = el.querySelector("#a_sew_list");
+    if (sewQ && !sewQ.dataset.wired){
+      sewQ.dataset.wired = "1";
+
+      const renderSEW = async ()=>{
+        const items = await db.faultsSearch(sewQ.value, { vendor: "SEW", product: "Variateur (MOVITRAC/MOVIDRIVE)" });
+        sewList.innerHTML = items.length ? items.map(f=>faultCard(f)).join("") : `<div class="small">Aucun résultat. Ajoute tes codes SEW avec ➕.</div>`;
+        wireFaultActions(sewList, renderSEW);
+      };
+
+      el.querySelector("#a_sew_reload").onclick = ()=> renderSEW();
+      sewQ.addEventListener("input", ()=> renderSEW());
+
+      el.querySelector("#a_sew_add").onclick = async ()=>{
+        await addFaultFlow({ vendor:"SEW", product:"Variateur (MOVITRAC/MOVIDRIVE)" });
+        await renderSEW();
+      };
+
+      await renderSEW();
+    }
+  }
+
+  function faultCard(f){
+    return `
+      <div class="item">
+        <div class="top">
+          <div>
+            <div class="name"><b>${ui.esc(f.code)}</b> • ${ui.esc(f.title || "(sans titre)")}</div>
+            <div class="meta">${ui.esc(f.vendor)} • ${ui.esc(f.product)}</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center">
+            <button class="btn" data-edit="${f.id}" style="padding:10px 12px">Éditer</button>
+            <button class="btn danger" data-del="${f.id}" style="padding:10px 12px">Suppr</button>
+          </div>
+        </div>
+        <div class="sep"></div>
+        ${f.causes ? `<div class="meta"><b>Causes</b> : ${ui.esc(f.causes)}</div>` : ""}
+        ${f.actions ? `<div class="meta" style="margin-top:6px"><b>Actions</b> : ${ui.esc(f.actions)}</div>` : ""}
+        ${f.notes ? `<div class="meta" style="margin-top:6px"><b>Notes</b> : ${ui.esc(f.notes)}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function wireFaultActions(container, rerender){
+    container.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.onclick = async ()=>{
+        const ok = await ui.confirmDanger({ title:"Supprimer défaut", message:"Supprimer cette fiche défaut ?", phrase:"SUPPRIMER" });
+        if (!ok) return;
+        await db.deleteFault(btn.dataset.del);
+        ui.toast("Supprimé.");
+        rerender();
+      };
+    });
+    container.querySelectorAll("[data-edit]").forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = btn.dataset.edit;
+        const cur = await db.get("faults", id);
+        if (!cur) return;
+        const title = await ui.promptText({ title:"Titre", label:"Court", placeholder:"Ex: défaut bus", value: cur.title || "" });
+        if (title === null) return;
+        const causes = await ui.promptText({ title:"Causes", label:"Résumé", placeholder:"Ex: câble, terminaison…", value: cur.causes || "" });
+        if (causes === null) return;
+        const actions = await ui.promptText({ title:"Actions", label:"Pistes dépannage", placeholder:"Ex: diag buffer, vérifier 24V…", value: cur.actions || "" });
+        if (actions === null) return;
+        const notes = await ui.promptText({ title:"Notes perso", label:"Libre", placeholder:"Ex: SFA36 zone convoyeur…", value: cur.notes || "" });
+        if (notes === null) return;
+        await db.updateFault(id, { title, causes, actions, notes });
+        ui.toast("Mis à jour.");
+        rerender();
+      };
+    });
+  }
+
+  async function addFaultFlow({vendor, product}){
+    const code = await ui.promptText({ title:"Code défaut", label:"Obligatoire", placeholder:"Ex: BF, SF, F12…", value:"" });
+    if (!code) return;
+    const title = await ui.promptText({ title:"Titre", label:"Obligatoire", placeholder:"Ex: défaut communication", value:"" });
+    if (title === null) return;
+    const causes = await ui.promptText({ title:"Causes (option)", label:"Résumé", placeholder:"Ex: câble, terminaison, adresse…", value:"" }) || "";
+    const actions = await ui.promptText({ title:"Actions (option)", label:"Pistes dépannage", placeholder:"Ex: lire buffer diag…", value:"" }) || "";
+    const notes = await ui.promptText({ title:"Notes perso (option)", label:"Libre", placeholder:"Ex: déjà vu sur SFA37…", value:"" }) || "";
+    try{
+      await db.addFault({ vendor, product, code, title, causes, actions, notes });
+      ui.toast("Ajouté.");
+    }catch{
+      ui.toast("Ajout impossible.");
+    }
+  }
+
+
+async function wireMeca(){
     // Thread dropdowns
     const selSize = el.querySelector("#t_size");
     const selPitch = el.querySelector("#t_pitch");

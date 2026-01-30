@@ -34,3 +34,7 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 - Pas ISO: choix M + pas (standard/fin) + perçage taraudage (approx)
 - Roulements: base editable (recherche + ajout/suppression)
 - Conversions: Nm ↔ daN·m
+
+## V5 — Automatisme
+- Menu Automatisme (PLC Siemens + Variateurs SEW)
+- Base défauts offline, recherche + ajout + édition + suppression

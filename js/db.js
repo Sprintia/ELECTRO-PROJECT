@@ -1,6 +1,6 @@
 // IndexedDB wrapper — Electro Terrain V1
 const DB_NAME = "electroTerrain";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 function uid(prefix="id"){
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
@@ -33,6 +33,13 @@ class DB {
         // Mechanical: bearings database (editable)
         const bearings = db.createObjectStore("bearings", { keyPath: "id" });
         bearings.createIndex("by_ref", "ref", { unique: false });
+
+        // Automation: faults database (editable)
+        const faults = db.createObjectStore("faults", { keyPath: "id" });
+        faults.createIndex("by_vendor", "vendor", { unique: false });
+        faults.createIndex("by_product", "product", { unique: false });
+        faults.createIndex("by_code", "code", { unique: false });
+
 
         checklists.createIndex("by_scope", "scope", { unique: false });
         checklists.createIndex("by_node", "nodeId", { unique: false });
@@ -203,6 +210,46 @@ class DB {
       });
     }
 
+
+    // Seed: automatisme faults (templates de base — à enrichir)
+    const flt = [
+      {
+        vendor: "Siemens",
+        product: "PLC (Step7/TIA)",
+        code: "BF",
+        title: "Bus Fault (défaut bus)",
+        causes: "Perte de communication sur le bus (PROFIBUS/PROFINET/AS-i selon équipement).",
+        actions: "Vérifier alimentation modules, câbles/connexions, terminaison, adresse/nom PROFINET, switch, diagnostics ET200/IM.",
+        notes: "Ajouter ici tes cas réels (ex: ET200 zone convoyeur)."
+      },
+      {
+        vendor: "Siemens",
+        product: "PLC (Step7/TIA)",
+        code: "SF",
+        title: "System Fault (défaut système)",
+        causes: "Erreur système/diagnostic module, configuration, périphérique en défaut.",
+        actions: "Lire le buffer de diagnostic, vérifier configuration HW, remplacer module si besoin, contrôler tension 24V.",
+        notes: ""
+      },
+      {
+        vendor: "SEW",
+        product: "Variateur (MOVITRAC/MOVIDRIVE)",
+        code: "EXEMPLE",
+        title: "Entrée d'exemple",
+        causes: "À remplacer par un vrai code (ex: Fxx) et causes constructeur.",
+        actions: "Ajoute tes codes SEW depuis manuel/étiquette variateur.",
+        notes: "Tu peux supprimer cette ligne."
+      }
+    ];
+    for (const f of flt){
+      await this.put("faults", {
+        id: uid("flt"),
+        ...f,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
+
     await this.setSetting("seeded", true);
   }
 
@@ -306,6 +353,67 @@ class DB {
 
 
   // ---- Mechanical: bearings ----
+
+  // ---- Automatisme: faults ----
+  async faultsAll(){
+    const items = await this.all("faults");
+    return items.sort((a,b)=> {
+      const va = (a.vendor||"").localeCompare(b.vendor||"", "fr");
+      if (va) return va;
+      const pa = (a.product||"").localeCompare(b.product||"", "fr");
+      if (pa) return pa;
+      return (a.code||"").localeCompare(b.code||"", "fr");
+    });
+  }
+
+  async faultsSearch(q, {vendor=null, product=null} = {}){
+    const query = (q||"").trim().toLowerCase();
+    const all = await this.faultsAll();
+    return all.filter(f=>{
+      if (vendor && f.vendor !== vendor) return false;
+      if (product && f.product !== product) return false;
+      if (!query) return true;
+      const txt = `${f.vendor} ${f.product} ${f.code} ${f.title||""} ${f.causes||""} ${f.actions||""} ${f.notes||""}`.toLowerCase();
+      return txt.includes(query);
+    });
+  }
+
+  async addFault({vendor, product, code, title="", causes="", actions="", notes=""}){
+    const id = `flt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+    const rec = {
+      id,
+      vendor: (vendor||"").trim(),
+      product: (product||"").trim(),
+      code: (code||"").trim().toUpperCase(),
+      title: (title||"").trim(),
+      causes: (causes||"").trim(),
+      actions: (actions||"").trim(),
+      notes: (notes||"").trim(),
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    if (!rec.vendor || !rec.product || !rec.code) throw new Error("Champs obligatoires manquants");
+    await this.put("faults", rec);
+    return rec;
+  }
+
+  async updateFault(id, patch){
+    const cur = await this.get("faults", id);
+    if (!cur) throw new Error("Introuvable");
+    const nxt = {
+      ...cur,
+      ...patch,
+      code: (patch.code ?? cur.code ?? "").trim().toUpperCase(),
+      updatedAt: Date.now()
+    };
+    await this.put("faults", nxt);
+    return nxt;
+  }
+
+  async deleteFault(id){
+    await this.del("faults", id);
+  }
+
   async bearingsAll(){
     const items = await this.all("bearings");
     // sort by ref then note
@@ -398,6 +506,46 @@ class DB {
         type: b.type,
         note: b.note,
         createdAt: Date.now()
+      });
+    }
+
+
+    // Seed: automatisme faults (templates de base — à enrichir)
+    const flt = [
+      {
+        vendor: "Siemens",
+        product: "PLC (Step7/TIA)",
+        code: "BF",
+        title: "Bus Fault (défaut bus)",
+        causes: "Perte de communication sur le bus (PROFIBUS/PROFINET/AS-i selon équipement).",
+        actions: "Vérifier alimentation modules, câbles/connexions, terminaison, adresse/nom PROFINET, switch, diagnostics ET200/IM.",
+        notes: "Ajouter ici tes cas réels (ex: ET200 zone convoyeur)."
+      },
+      {
+        vendor: "Siemens",
+        product: "PLC (Step7/TIA)",
+        code: "SF",
+        title: "System Fault (défaut système)",
+        causes: "Erreur système/diagnostic module, configuration, périphérique en défaut.",
+        actions: "Lire le buffer de diagnostic, vérifier configuration HW, remplacer module si besoin, contrôler tension 24V.",
+        notes: ""
+      },
+      {
+        vendor: "SEW",
+        product: "Variateur (MOVITRAC/MOVIDRIVE)",
+        code: "EXEMPLE",
+        title: "Entrée d'exemple",
+        causes: "À remplacer par un vrai code (ex: Fxx) et causes constructeur.",
+        actions: "Ajoute tes codes SEW depuis manuel/étiquette variateur.",
+        notes: "Tu peux supprimer cette ligne."
+      }
+    ];
+    for (const f of flt){
+      await this.put("faults", {
+        id: uid("flt"),
+        ...f,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
       });
     }
 
