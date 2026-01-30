@@ -46,5 +46,6 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 - Électrique: boutons Calculer remplissent aussi les champs U/I/R/P et P/I
 - Mécanique: pas ISO en tableau avec filtre
 
-## V6.2 — Fix IndexedDB upgrade
-- onupgradeneeded rendu idempotent (création stores/index seulement si absent)
+## V6.3 — Fix IndexedDB upgrade
+- onupgradeneeded idempotent (stores/indexes créés seulement si absents)
+- DB_VERSION bumped to 4
