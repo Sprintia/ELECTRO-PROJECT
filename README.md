@@ -41,3 +41,7 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 
 ## V5.1 — Fix affichage
 - Correction d'un await dans un handler non-async (bloquait tout le JS)
+
+## V6 — Fix elec + table pas ISO
+- Électrique: boutons Calculer remplissent aussi les champs U/I/R/P et P/I
+- Mécanique: pas ISO en tableau avec filtre
