@@ -38,3 +38,6 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 ## V5 — Automatisme
 - Menu Automatisme (PLC Siemens + Variateurs SEW)
 - Base défauts offline, recherche + ajout + édition + suppression
+
+## V5.1 — Fix affichage
+- Correction d'un await dans un handler non-async (bloquait tout le JS)

@@ -418,7 +418,7 @@ export async function renderTools(){
     showSection(el, "elec", "conv");
   };
 
-  el.querySelector("#goMeca").onclick = () => {
+  el.querySelector("#goMeca").onclick = async () => {
     mecaPanel.style.display = (mecaPanel.style.display === "none") ? "block" : "none";
     if (mecaPanel.style.display === "block") { elecPanel.style.display = "none"; autoPanel.style.display = "none"; }
     mecaPanel.scrollIntoView({behavior:"smooth", block:"start"});
