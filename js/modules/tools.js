@@ -1,8 +1,10 @@
 import { ui } from "../ui.js";
+import { db } from "../db.js";
 
 /**
- * ELECTRIQUE — V3.1
- * ✅ UX améliorée: on choisit l'outil avant d'afficher sa fenêtre.
+ * Outils — V4
+ * - Électrique (menu par outil)
+ * - Mécanique (menu par outil): Pas ISO + perçage taraudage, Roulements, Conversions
  */
 
 function num(x){
@@ -16,7 +18,7 @@ function fmt(x, digits=2){
 }
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
-// --- Helpers Elec ---
+// ---------- ELEC HELPERS ----------
 function sectionFromCurrentSimple(I){
   if (!Number.isFinite(I) || I <= 0) return null;
   const table = [
@@ -51,34 +53,57 @@ function pickStandard(over){
   return std[std.length-1];
 }
 
-function showSection(el, id){
-  el.querySelectorAll("[data-elec-section]").forEach(sec=>{
-    sec.style.display = (sec.dataset.elecSection === id) ? "block" : "none";
+// ---------- MECA DATA ----------
+const ISO_METRIC = [
+  // d, coarse pitch, tap drill (approx d - pitch), common fine pitches
+  { d: 2,  coarse: 0.4,  fine:[0.25], tap: 1.6 },
+  { d: 2.5,coarse: 0.45, fine:[0.35], tap: 2.05 },
+  { d: 3,  coarse: 0.5,  fine:[0.35], tap: 2.5 },
+  { d: 4,  coarse: 0.7,  fine:[0.5],  tap: 3.3 },
+  { d: 5,  coarse: 0.8,  fine:[0.5],  tap: 4.2 },
+  { d: 6,  coarse: 1.0,  fine:[0.75], tap: 5.0 },
+  { d: 8,  coarse: 1.25, fine:[1.0],  tap: 6.8 },
+  { d: 10, coarse: 1.5,  fine:[1.25,1.0], tap: 8.5 },
+  { d: 12, coarse: 1.75, fine:[1.5,1.25], tap: 10.2 },
+  { d: 14, coarse: 2.0,  fine:[1.5], tap: 12.0 },
+  { d: 16, coarse: 2.0,  fine:[1.5], tap: 14.0 },
+  { d: 18, coarse: 2.5,  fine:[2.0,1.5], tap: 15.5 },
+  { d: 20, coarse: 2.5,  fine:[2.0,1.5], tap: 17.5 },
+  { d: 22, coarse: 2.5,  fine:[2.0,1.5], tap: 19.5 },
+  { d: 24, coarse: 3.0,  fine:[2.0], tap: 21.0 },
+  { d: 27, coarse: 3.0,  fine:[2.0], tap: 24.0 },
+  { d: 30, coarse: 3.5,  fine:[2.0], tap: 26.5 },
+];
+
+function showSection(rootEl, group, id){
+  rootEl.querySelectorAll(`[data-${group}-section]`).forEach(sec=>{
+    sec.style.display = (sec.dataset[`${group}Section`] === id) ? "block" : "none";
   });
-  el.querySelectorAll("[data-elec-pick]").forEach(btn=>{
-    btn.classList.toggle("active", btn.dataset.elecPick === id);
+  rootEl.querySelectorAll(`[data-${group}-pick]`).forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset[`${group}Pick`] === id);
   });
 }
 
 export async function renderTools(){
-  ui.setTitle("Outils", "Électrique • Choix par outil");
+  ui.setTitle("Outils", "Électrique + Mécanique");
 
   const el = document.getElementById("view");
   el.innerHTML = `
     <div class="grid">
       <button class="bigbtn" id="goElec">
-        <span class="left"><span style="font-size:20px">⚡</span><span><b>Électrique</b><div class="small">Choisir un outil → ouvrir</div></span></span>
-        <span class="pill">V3.1</span>
+        <span class="left"><span style="font-size:20px">⚡</span><span><b>Électrique</b><div class="small">Menu → choisir l’outil</div></span></span>
+        <span class="pill">OK</span>
       </button>
 
-      <div class="card flat">
-        <h3>OK pour l’élec</h3>
-        <p>On pourra ensuite passer à Mécanique puis Automatisme, quand tu veux.</p>
-      </div>
+      <button class="bigbtn" id="goMeca">
+        <span class="left"><span style="font-size:20px">🛠️</span><span><b>Mécanique</b><div class="small">Pas ISO • Roulements • Conversions</div></span></span>
+        <span class="pill">V4</span>
+      </button>
     </div>
 
     <div class="sep"></div>
 
+    <!-- ELEC PANEL -->
     <div id="elecPanel" class="card flat" style="display:none">
       <div class="row" style="justify-content:space-between; align-items:center">
         <h3 style="margin:0">⚡ Électrique</h3>
@@ -87,32 +112,19 @@ export async function renderTools(){
       <div class="sep"></div>
 
       <div class="row" style="gap:10px; flex-wrap:wrap">
-        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="conv">
-          <span class="navicon">🔁</span><span class="navtxt">Convertisseurs</span>
-        </button>
-        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="ohm">
-          <span class="navicon">Ω</span><span class="navtxt">Ohm & P</span>
-        </button>
-        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="power">
-          <span class="navicon">√3</span><span class="navtxt">Mono/Tri</span>
-        </button>
-        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="drop">
-          <span class="navicon">📉</span><span class="navtxt">Chute & Section</span>
-        </button>
-        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="motor">
-          <span class="navicon">🧲</span><span class="navtxt">Courant moteur</span>
-        </button>
-        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="prot">
-          <span class="navicon">🛡️</span><span class="navtxt">Protections</span>
-        </button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="conv"><span class="navicon">🔁</span><span class="navtxt">Convertisseurs</span></button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="ohm"><span class="navicon">Ω</span><span class="navtxt">Ohm & P</span></button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="power"><span class="navicon">√3</span><span class="navtxt">Mono/Tri</span></button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="drop"><span class="navicon">📉</span><span class="navtxt">Chute & Section</span></button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="motor"><span class="navicon">🧲</span><span class="navtxt">Courant moteur</span></button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-elec-pick="prot"><span class="navicon">🛡️</span><span class="navtxt">Protections</span></button>
       </div>
 
       <div class="sep"></div>
 
-      <!-- SECTION: Convertisseurs -->
       <div data-elec-section="conv" style="display:none">
         <div class="card flat">
-          <h3>Convertisseurs rapides</h3>
+          <h3>Convertisseurs</h3>
           <label>Valeur</label>
           <input id="c_val" placeholder="Ex: 230" inputmode="decimal">
           <label>Type</label>
@@ -124,7 +136,6 @@ export async function renderTools(){
             <option value="ohm_kohm">Ω ↔ kΩ</option>
             <option value="hz_rpm">Hz ↔ RPM (moteur)</option>
           </select>
-
           <div id="hzExtra" style="display:none">
             <label>Nombre de pôles</label>
             <select id="poles">
@@ -135,30 +146,25 @@ export async function renderTools(){
             </select>
             <div class="small">RPM synchrone ≈ 120×f / pôles.</div>
           </div>
-
           <div class="sep"></div>
           <button class="btn primary" id="c_calc">Convertir</button>
           <div class="sep"></div>
-          <div class="item">
-            <div class="name" id="c_out1">—</div>
-            <div class="meta" id="c_out2"></div>
-          </div>
+          <div class="item"><div class="name" id="c_out1">—</div><div class="meta" id="c_out2"></div></div>
         </div>
       </div>
 
-      <!-- SECTION: Ohm -->
       <div data-elec-section="ohm" style="display:none">
         <div class="card flat">
-          <h3>Loi d’Ohm & Puissance</h3>
+          <h3>Ohm & Puissance</h3>
           <div class="form2">
-            <div><label>U (V)</label><input id="o_u" placeholder="Ex: 24" inputmode="decimal"></div>
-            <div><label>I (A)</label><input id="o_i" placeholder="Ex: 2.5" inputmode="decimal"></div>
+            <div><label>U (V)</label><input id="o_u" inputmode="decimal" placeholder="24"></div>
+            <div><label>I (A)</label><input id="o_i" inputmode="decimal" placeholder="2.5"></div>
           </div>
           <div class="form2">
-            <div><label>R (Ω)</label><input id="o_r" placeholder="Ex: 9.6" inputmode="decimal"></div>
-            <div><label>P (W)</label><input id="o_p" placeholder="Ex: 60" inputmode="decimal"></div>
+            <div><label>R (Ω)</label><input id="o_r" inputmode="decimal" placeholder="9.6"></div>
+            <div><label>P (W)</label><input id="o_p" inputmode="decimal" placeholder="60"></div>
           </div>
-          <div class="small">Remplis 2 champs, je calcule les autres.</div>
+          <div class="small">Remplis 2 champs.</div>
           <div class="sep"></div>
           <button class="btn primary" id="o_calc">Calculer</button>
           <div class="sep"></div>
@@ -166,24 +172,22 @@ export async function renderTools(){
         </div>
       </div>
 
-      <!-- SECTION: Mono/Tri -->
       <div data-elec-section="power" style="display:none">
         <div class="card flat">
-          <h3>Mono / Tri (courant ou puissance)</h3>
+          <h3>Mono / Tri</h3>
           <label>Système</label>
           <select id="p_sys">
-            <option value="mono">Monophasé (P = U×I×cosφ)</option>
-            <option value="tri" selected>Triphasé (P = √3×U×I×cosφ)</option>
+            <option value="mono">Monophasé</option>
+            <option value="tri" selected>Triphasé</option>
           </select>
           <div class="form2">
-            <div><label>U (V)</label><input id="p_u" placeholder="Ex: 400" inputmode="decimal"></div>
-            <div><label>cosφ</label><input id="p_cos" placeholder="Ex: 0.85" inputmode="decimal" value="0.85"></div>
+            <div><label>U (V)</label><input id="p_u" inputmode="decimal" placeholder="400"></div>
+            <div><label>cosφ</label><input id="p_cos" inputmode="decimal" value="0.85"></div>
           </div>
           <div class="form2">
-            <div><label>P (kW)</label><input id="p_kw" placeholder="Ex: 7.5" inputmode="decimal"></div>
-            <div><label>I (A)</label><input id="p_i" placeholder="Ex: 15" inputmode="decimal"></div>
+            <div><label>P (kW)</label><input id="p_kw" inputmode="decimal" placeholder="7.5"></div>
+            <div><label>I (A)</label><input id="p_i" inputmode="decimal" placeholder="15"></div>
           </div>
-          <div class="small">Remplis soit P, soit I.</div>
           <div class="sep"></div>
           <button class="btn primary" id="p_calc">Calculer</button>
           <div class="sep"></div>
@@ -191,129 +195,165 @@ export async function renderTools(){
         </div>
       </div>
 
-      <!-- SECTION: Chute -->
       <div data-elec-section="drop" style="display:none">
         <div class="card flat">
-          <h3>Chute de tension + section (rapide)</h3>
+          <h3>Chute + Section (rapide)</h3>
           <label>Système</label>
-          <select id="d_sys">
-            <option value="tri" selected>Triphasé</option>
-            <option value="mono">Monophasé</option>
-          </select>
+          <select id="d_sys"><option value="tri" selected>Triphasé</option><option value="mono">Monophasé</option></select>
           <div class="form2">
             <div><label>U (V)</label><input id="d_u" inputmode="decimal" value="400"></div>
-            <div><label>Longueur (m)</label><input id="d_l" placeholder="Ex: 35" inputmode="decimal"></div>
+            <div><label>Longueur (m)</label><input id="d_l" inputmode="decimal" placeholder="35"></div>
           </div>
           <div class="form2">
-            <div><label>Courant I (A)</label><input id="d_i" placeholder="Ex: 20" inputmode="decimal"></div>
-            <div>
-              <label>Matériau</label>
-              <select id="d_mat">
-                <option value="cu" selected>Cuivre</option>
-                <option value="al">Aluminium</option>
-              </select>
-            </div>
+            <div><label>I (A)</label><input id="d_i" inputmode="decimal" placeholder="20"></div>
+            <div><label>Matériau</label><select id="d_mat"><option value="cu" selected>Cuivre</option><option value="al">Aluminium</option></select></div>
           </div>
           <div class="form2">
-            <div>
-              <label>Chute max (%)</label>
-              <select id="d_max">
-                <option value="3" selected>3 %</option>
-                <option value="5">5 %</option>
-                <option value="8">8 %</option>
-              </select>
-            </div>
-            <div><label>Section test (mm²) (option)</label><input id="d_s" placeholder="Ex: 6" inputmode="decimal"></div>
+            <div><label>Chute max (%)</label><select id="d_max"><option value="3" selected>3%</option><option value="5">5%</option><option value="8">8%</option></select></div>
+            <div><label>Section test (mm²)</label><input id="d_s" inputmode="decimal" placeholder="6"></div>
           </div>
           <div class="sep"></div>
           <button class="btn primary" id="d_calc">Calculer</button>
           <div class="sep"></div>
           <div class="item"><div class="meta" id="d_out">—</div></div>
-          <div class="small" style="margin-top:8px">⚠️ Formule simplifiée (sans X, sans corrections).</div>
         </div>
       </div>
 
-      <!-- SECTION: Moteur -->
       <div data-elec-section="motor" style="display:none">
         <div class="card flat">
           <h3>Courant moteur (kW → A)</h3>
           <label>Système</label>
-          <select id="m_sys">
-            <option value="tri" selected>Triphasé</option>
-            <option value="mono">Monophasé</option>
-          </select>
+          <select id="m_sys"><option value="tri" selected>Triphasé</option><option value="mono">Monophasé</option></select>
           <div class="form2">
-            <div><label>Puissance (kW)</label><input id="m_kw" placeholder="Ex: 7.5" inputmode="decimal"></div>
+            <div><label>kW</label><input id="m_kw" inputmode="decimal" placeholder="7.5"></div>
             <div><label>U (V)</label><input id="m_u" inputmode="decimal" value="400"></div>
           </div>
           <div class="form2">
             <div><label>cosφ</label><input id="m_cos" inputmode="decimal" value="0.85"></div>
-            <div><label>Rendement η</label><input id="m_eta" inputmode="decimal" value="0.9"></div>
+            <div><label>η</label><input id="m_eta" inputmode="decimal" value="0.9"></div>
           </div>
           <div class="sep"></div>
           <button class="btn primary" id="m_calc">Calculer</button>
           <div class="sep"></div>
           <div class="item"><div class="meta" id="m_out">—</div></div>
-          <div class="small" style="margin-top:8px">Astuce: par défaut η=0,9 et cosφ=0,85 si tu n’as pas la plaque complète.</div>
         </div>
       </div>
 
-      <!-- SECTION: Protections -->
       <div data-elec-section="prot" style="display:none">
         <div class="card flat">
-          <h3>Aide protections (disjoncteur / fusibles)</h3>
-          <label>Courant nominal In (A)</label>
-          <input id="prot_i" placeholder="Ex: 14.2" inputmode="decimal">
-
+          <h3>Protections (aide)</h3>
+          <label>In (A)</label><input id="prot_i" inputmode="decimal" placeholder="14.2">
           <div class="form2">
-            <div>
-              <label>Charge</label>
-              <select id="prot_load">
-                <option value="general" selected>Général</option>
-                <option value="motor">Moteur</option>
-              </select>
-            </div>
-            <div>
-              <label>Marge</label>
-              <select id="prot_margin">
-                <option value="1.15" selected>+15%</option>
-                <option value="1.25">+25%</option>
-                <option value="1.40">+40%</option>
-              </select>
-            </div>
+            <div><label>Charge</label><select id="prot_load"><option value="general" selected>Général</option><option value="motor">Moteur</option></select></div>
+            <div><label>Marge</label><select id="prot_margin"><option value="1.15" selected>+15%</option><option value="1.25">+25%</option><option value="1.40">+40%</option></select></div>
           </div>
-
           <div class="sep"></div>
           <button class="btn primary" id="prot_calc">Proposer</button>
           <div class="sep"></div>
           <div class="item"><div class="meta" id="prot_out">—</div></div>
+          <div class="small" style="margin-top:8px">⚠️ Vérifier Ik, sélectivité, courbe, section, pose.</div>
+        </div>
+      </div>
+    </div>
 
-          <div class="small" style="margin-top:8px">⚠️ Aide terrain: vérifier Ik, sélectivité, courbe, section, conditions de pose.</div>
+    <!-- MECA PANEL -->
+    <div id="mecaPanel" class="card flat" style="display:none">
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <h3 style="margin:0">🛠️ Mécanique</h3>
+        <span class="pill">terrain</span>
+      </div>
+      <div class="sep"></div>
+
+      <div class="row" style="gap:10px; flex-wrap:wrap">
+        <button class="navbtn" style="flex:1; min-width:160px" data-meca-pick="thread"><span class="navicon">🔩</span><span class="navtxt">Pas ISO</span></button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-meca-pick="bearing"><span class="navicon">⚪</span><span class="navtxt">Roulements</span></button>
+        <button class="navbtn" style="flex:1; min-width:160px" data-meca-pick="conv"><span class="navicon">🔁</span><span class="navtxt">Conversions</span></button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div data-meca-section="thread" style="display:none">
+        <div class="card flat">
+          <h3>Pas ISO métrique</h3>
+          <label>Taille (Mx)</label>
+          <select id="t_size"></select>
+          <label>Pas</label>
+          <select id="t_pitch"></select>
+          <div class="sep"></div>
+          <button class="btn primary" id="t_calc">Afficher</button>
+          <div class="sep"></div>
+          <div class="item"><div class="meta" id="t_out">—</div></div>
+          <div class="small" style="margin-top:8px">Perçage taraudage ≈ d - pas (approx terrain).</div>
+        </div>
+      </div>
+
+      <div data-meca-section="bearing" style="display:none">
+        <div class="card flat">
+          <h3>Roulements (base éditable)</h3>
+          <label>Recherche</label>
+          <input id="b_q" placeholder="Ex: 6204, 6305, 2RS, 20x47x14…" />
+          <div class="sep"></div>
+          <div class="btnrow">
+            <button class="btn primary" id="b_add">➕ Ajouter</button>
+            <button class="btn" id="b_reload">↻ Rafraîchir</button>
+          </div>
+          <div class="sep"></div>
+          <div id="b_list" class="list"></div>
+        </div>
+      </div>
+
+      <div data-meca-section="conv" style="display:none">
+        <div class="card flat">
+          <h3>Conversions</h3>
+          <label>Couple (Nm)</label>
+          <input id="c_nm" inputmode="decimal" placeholder="Ex: 50">
+          <div class="sep"></div>
+          <button class="btn primary" id="c_conv">Convertir</button>
+          <div class="sep"></div>
+          <div class="item">
+            <div class="meta" id="c_conv_out">—</div>
+          </div>
+          <div class="small" style="margin-top:8px">1 daN·m = 10 N·m</div>
         </div>
       </div>
     </div>
   `;
 
-  const panel = el.querySelector("#elecPanel");
+  // Toggle panels
+  const elecPanel = el.querySelector("#elecPanel");
+  const mecaPanel = el.querySelector("#mecaPanel");
+
   el.querySelector("#goElec").onclick = () => {
-    panel.style.display = (panel.style.display === "none") ? "block" : "none";
-    panel.scrollIntoView({behavior:"smooth", block:"start"});
-    // Default selection the first time panel opens
-    showSection(el, "conv");
+    elecPanel.style.display = (elecPanel.style.display === "none") ? "block" : "none";
+    if (elecPanel.style.display === "block") mecaPanel.style.display = "none";
+    elecPanel.scrollIntoView({behavior:"smooth", block:"start"});
+    showSection(el, "elec", "conv");
+  };
+
+  el.querySelector("#goMeca").onclick = () => {
+    mecaPanel.style.display = (mecaPanel.style.display === "none") ? "block" : "none";
+    if (mecaPanel.style.display === "block") elecPanel.style.display = "none";
+    mecaPanel.scrollIntoView({behavior:"smooth", block:"start"});
+    showSection(el, "meca", "thread");
+    await wireMeca(); // ensure wired after open
   };
 
   // Picker buttons
   el.querySelectorAll("[data-elec-pick]").forEach(btn=>{
     btn.onclick = ()=>{
-      showSection(el, btn.dataset.elecPick);
-      // Scroll to section
-      const sec = el.querySelector(`[data-elec-section="${btn.dataset.elecPick}"]`);
-      sec?.scrollIntoView({behavior:"smooth", block:"start"});
+      showSection(el, "elec", btn.dataset.elecPick);
+      el.querySelector(`[data-elec-section="${btn.dataset.elecPick}"]`)?.scrollIntoView({behavior:"smooth", block:"start"});
+    };
+  });
+  el.querySelectorAll("[data-meca-pick]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      showSection(el, "meca", btn.dataset.mecaPick);
+      el.querySelector(`[data-meca-section="${btn.dataset.mecaPick}"]`)?.scrollIntoView({behavior:"smooth", block:"start"});
+      await wireMeca();
     };
   });
 
-  // --- Wire up calculators (events are bound once; sections exist in DOM) ---
-
+  // ---------- ELEC WIRING ----------
   // Convertisseurs
   const cType = el.querySelector("#c_type");
   const hzExtra = el.querySelector("#hzExtra");
@@ -443,4 +483,109 @@ export async function renderTools(){
     }
     el.querySelector("#prot_out").innerHTML = `<b>Entrée</b> : In=${fmt(In,2)}A • marge=${fmt(margin*100-100,0)}% → Iref≈${fmt(Iref,2)}A<br><b>Standard</b> : ${fmt(suggested,0)}A<div class="sep"></div>${advice}`;
   };
+
+  // ---------- MECA WIRING (idempotent) ----------
+  async function wireMeca(){
+    // Thread dropdowns
+    const selSize = el.querySelector("#t_size");
+    const selPitch = el.querySelector("#t_pitch");
+    const out = el.querySelector("#t_out");
+    if (selSize && !selSize.dataset.wired){
+      selSize.dataset.wired = "1";
+      selSize.innerHTML = ISO_METRIC.map(r=>`<option value="${r.d}">M${r.d}</option>`).join("");
+      selSize.value = "10";
+      const refreshPitch = ()=>{
+        const d = num(selSize.value);
+        const row = ISO_METRIC.find(x=>x.d===d) || ISO_METRIC[0];
+        const pitches = [row.coarse, ...(row.fine||[])];
+        selPitch.innerHTML = pitches.map(p=>`<option value="${p}">${p} mm</option>`).join("");
+        selPitch.value = String(row.coarse);
+      };
+      selSize.addEventListener("change", refreshPitch);
+      refreshPitch();
+
+      el.querySelector("#t_calc").onclick = ()=>{
+        const d = num(selSize.value);
+        const pitch = num(selPitch.value);
+        if (!Number.isFinite(d) || !Number.isFinite(pitch)){ ui.toast("Valeurs invalides."); return; }
+        const tap = d - pitch; // simple
+        out.innerHTML = `<b>M${fmt(d,2)}</b> • pas <b>${fmt(pitch,2)} mm</b><br>Perçage taraudage (approx) ≈ <b>${fmt(tap,2)} mm</b>`;
+      };
+      // initial
+      el.querySelector("#t_calc").click();
+    }
+
+    // Bearings list
+    const q = el.querySelector("#b_q");
+    const list = el.querySelector("#b_list");
+    if (q && !q.dataset.wired){
+      q.dataset.wired = "1";
+      const render = async ()=>{
+        const items = await db.bearingsSearch(q.value);
+        if (!items.length){
+          list.innerHTML = `<div class="small">Aucun roulement. Ajoute-en avec ➕.</div>`;
+          return;
+        }
+        list.innerHTML = items.map(b=>`
+          <div class="item">
+            <div class="top">
+              <div>
+                <div class="name">${ui.esc(b.ref)}${b.type?` • ${ui.esc(b.type)}`:""}</div>
+                <div class="meta">${b.d?ui.esc(`${b.d}`):"?"}×${b.D?ui.esc(`${b.D}`):"?"}×${b.B?ui.esc(`${b.B}`):"?"} mm${b.note?` • ${ui.esc(b.note)}`:""}</div>
+              </div>
+              <button class="btn danger" data-del="${b.id}" style="flex:0 0 auto; padding:10px 12px">Suppr</button>
+            </div>
+          </div>
+        `).join("");
+        list.querySelectorAll("[data-del]").forEach(btn=>{
+          btn.onclick = async ()=>{
+            const ok = await ui.confirmDanger({ title:"Supprimer roulement", message:`Supprimer ${btn.closest(".item").querySelector(".name").textContent}?`, phrase:"SUPPRIMER" });
+            if (!ok) return;
+            await db.deleteBearing(btn.dataset.del);
+            ui.toast("Supprimé.");
+            render();
+          };
+        });
+      };
+      q.addEventListener("input", ()=> render());
+      el.querySelector("#b_reload").onclick = ()=> render();
+
+      el.querySelector("#b_add").onclick = async ()=>{
+        const ref = await ui.promptText({ title:"Référence roulement", label:"Ex: 6204 2RS", placeholder:"6204 2RS" });
+        if (!ref) return;
+        const dims = await ui.promptText({ title:"Dimensions (d×D×B)", label:"Format", placeholder:"Ex: 20x47x14", value:"" });
+        let d=null,D=null,B=null;
+        if (dims){
+          const m = dims.toLowerCase().replace(/\s/g,"").match(/(\d+(\.\d+)?)x(\d+(\.\d+)?)x(\d+(\.\d+)?)/);
+          if (m){
+            d = Number(m[1]); D = Number(m[3]); B = Number(m[5]);
+          }
+        }
+        const type = await ui.promptText({ title:"Type / suffixe (option)", label:"Ex: 2RS, ZZ, C3", placeholder:"2RS", value:"" }) || "";
+        const note = await ui.promptText({ title:"Note (option)", label:"Libre", placeholder:"Ex: côté moteur convoyeur", value:"" }) || "";
+        try{
+          await db.addBearing({ ref, d, D, B, type, note });
+          ui.toast("Ajouté.");
+          q.value = ref;
+          render();
+        }catch{
+          ui.toast("Ajout impossible.");
+        }
+      };
+
+      await render();
+    }
+
+    // Conversions
+    const nm = el.querySelector("#c_nm");
+    if (nm && !nm.dataset.wired){
+      nm.dataset.wired = "1";
+      el.querySelector("#c_conv").onclick = ()=>{
+        const v = num(nm.value);
+        if (!Number.isFinite(v)){ ui.toast("Entre un couple en Nm."); return; }
+        const danm = v/10;
+        el.querySelector("#c_conv_out").innerHTML = `<b>${fmt(v,2)} N·m</b> = <b>${fmt(danm,2)} daN·m</b>`;
+      };
+    }
+  }
 }

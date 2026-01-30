@@ -1,6 +1,6 @@
 // IndexedDB wrapper — Electro Terrain V1
 const DB_NAME = "electroTerrain";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function uid(prefix="id"){
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
@@ -27,6 +27,13 @@ class DB {
         interventions.createIndex("by_date", "createdAt", { unique: false });
 
         const checklists = db.createObjectStore("checklists", { keyPath: "id" });
+        checklists.createIndex("by_scope", "scope", { unique: false });
+        checklists.createIndex("by_node", "nodeId", { unique: false });
+
+        // Mechanical: bearings database (editable)
+        const bearings = db.createObjectStore("bearings", { keyPath: "id" });
+        bearings.createIndex("by_ref", "ref", { unique: false });
+
         checklists.createIndex("by_scope", "scope", { unique: false });
         checklists.createIndex("by_node", "nodeId", { unique: false });
 
@@ -172,6 +179,30 @@ class DB {
       });
     }
 
+
+    // Seed: bearings (common refs)
+    const brgs = [
+      { ref:"6201", d:12, D:32, B:10, type:"deep groove", note:"base" },
+      { ref:"6202", d:15, D:35, B:11, type:"deep groove", note:"base" },
+      { ref:"6203", d:17, D:40, B:12, type:"deep groove", note:"base" },
+      { ref:"6204", d:20, D:47, B:14, type:"deep groove", note:"base" },
+      { ref:"6205", d:25, D:52, B:15, type:"deep groove", note:"base" },
+      { ref:"6304", d:20, D:52, B:15, type:"deep groove", note:"base" },
+      { ref:"6305", d:25, D:62, B:17, type:"deep groove", note:"base" },
+      { ref:"6004", d:20, D:42, B:12, type:"deep groove", note:"base" },
+      { ref:"6005", d:25, D:47, B:12, type:"deep groove", note:"base" }
+    ];
+    for (const b of brgs){
+      await this.put("bearings", {
+        id: uid("brg"),
+        ref: b.ref,
+        d: b.d, D: b.D, B: b.B,
+        type: b.type,
+        note: b.note,
+        createdAt: Date.now()
+      });
+    }
+
     await this.setSetting("seeded", true);
   }
 
@@ -273,6 +304,45 @@ class DB {
     return items.sort((a,b)=> (a.title||"").localeCompare(b.title||"", "fr"));
   }
 
+
+  // ---- Mechanical: bearings ----
+  async bearingsAll(){
+    const items = await this.all("bearings");
+    // sort by ref then note
+    return items.sort((a,b)=> (a.ref||"").localeCompare(b.ref||"", "fr"));
+  }
+
+  async bearingsSearch(q){
+    const query = (q || "").trim().toLowerCase();
+    const all = await this.bearingsAll();
+    if (!query) return all;
+    return all.filter(b => {
+      const txt = `${b.ref} ${b.type||""} ${b.note||""} ${b.d||""} ${b.D||""} ${b.B||""}`.toLowerCase();
+      return txt.includes(query);
+    });
+  }
+
+  async addBearing({ref, d, D, B, type="", note=""}){
+    const id = `brg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+    const rec = {
+      id,
+      ref: (ref||"").trim().toUpperCase(),
+      d: Number(d)||null,
+      D: Number(D)||null,
+      B: Number(B)||null,
+      type: (type||"").trim(),
+      note: (note||"").trim(),
+      createdAt: Date.now()
+    };
+    if (!rec.ref) throw new Error("Référence vide");
+    await this.put("bearings", rec);
+    return rec;
+  }
+
+  async deleteBearing(id){
+    await this.del("bearings", id);
+  }
+
   async globalTemplates(){
     const all = await this.queryIndex("checklists","by_scope","global");
     return all.sort((a,b)=> (a.title||"").localeCompare(b.title||"", "fr"));
@@ -306,6 +376,30 @@ class DB {
     for (const n of nodes) await this.put("nodes", n);
     for (const i of interventions) await this.put("interventions", i);
     for (const c of checklists) await this.put("checklists", c);
+
+
+    // Seed: bearings (common refs)
+    const brgs = [
+      { ref:"6201", d:12, D:32, B:10, type:"deep groove", note:"base" },
+      { ref:"6202", d:15, D:35, B:11, type:"deep groove", note:"base" },
+      { ref:"6203", d:17, D:40, B:12, type:"deep groove", note:"base" },
+      { ref:"6204", d:20, D:47, B:14, type:"deep groove", note:"base" },
+      { ref:"6205", d:25, D:52, B:15, type:"deep groove", note:"base" },
+      { ref:"6304", d:20, D:52, B:15, type:"deep groove", note:"base" },
+      { ref:"6305", d:25, D:62, B:17, type:"deep groove", note:"base" },
+      { ref:"6004", d:20, D:42, B:12, type:"deep groove", note:"base" },
+      { ref:"6005", d:25, D:47, B:12, type:"deep groove", note:"base" }
+    ];
+    for (const b of brgs){
+      await this.put("bearings", {
+        id: uid("brg"),
+        ref: b.ref,
+        d: b.d, D: b.D, B: b.B,
+        type: b.type,
+        note: b.note,
+        createdAt: Date.now()
+      });
+    }
 
     await this.setSetting("seeded", true);
   }

@@ -29,3 +29,8 @@ Dans l'app : bouton ⤓ (en haut) ou Réglages → Exporter/Importer.
 
 ## V3.1 — UX outils
 - Électrique: choix de l’outil avant affichage (menu)
+
+## V4 — Mécanique
+- Pas ISO: choix M + pas (standard/fin) + perçage taraudage (approx)
+- Roulements: base editable (recherche + ajout/suppression)
+- Conversions: Nm ↔ daN·m
