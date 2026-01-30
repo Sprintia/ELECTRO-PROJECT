@@ -15,6 +15,8 @@ class DB {
     if (this.db) return;
     this.db = await new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
+      // If an old tab/app keeps the DB open, upgrades can be blocked on iOS.
+      req.onblocked = () => reject(new Error("Base locale bloquée (mise à jour). Ferme les autres onglets/PWA ElectroTerrain puis relance."));
       req.onupgradeneeded = () => {
         const db = req.result;
 
@@ -46,7 +48,12 @@ class DB {
 
         const settings = db.createObjectStore("settings", { keyPath: "key" });
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // Auto-close on version change to avoid blocking future upgrades.
+        db.onversionchange = () => { try{ db.close(); }catch{} };
+        resolve(db);
+      };
       req.onerror = () => reject(req.error);
     });
   }

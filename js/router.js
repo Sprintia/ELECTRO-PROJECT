@@ -33,6 +33,12 @@ export class Router {
       return;
     }
     this.viewEl.innerHTML = `<div class="card flat"><div class="small">Chargement…</div></div>`;
-    await route.handler(params);
+    try{
+      await route.handler(params);
+    }catch(err){
+      // Keep the loading state from being permanent
+      this.viewEl.innerHTML = `<div class="card flat"><h3>Erreur</h3><div class="small">Un module a planté. Détails ci-dessous.</div><pre style="white-space:pre-wrap;font-size:12px;opacity:.9">${String(err && err.stack ? err.stack : err)}</pre></div>`;
+      throw err;
+    }
   }
 }

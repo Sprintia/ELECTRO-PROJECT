@@ -74,11 +74,24 @@ router.onBeforeRender(async () => {
   setActiveNav(hash);
 });
 
-router.start(view);
 
 // Init DB and seed demo data on first run
 (async () => {
   await db.init();
   await db.ensureSeed();
   router.refresh();
+})();
+
+
+// Init DB then start router (avoid 'Chargement…' stuck if DB upgrade is blocked)
+(async () => {
+  try{
+    view.innerHTML = `<div class="card flat"><div class="small">Initialisation…</div></div>`;
+    await db.init();
+    await db.ensureSeed();
+    router.start(view);
+  }catch(err){
+    view.innerHTML = `<div class="card flat"><h3>Erreur</h3><div class="small">${ui.esc(String(err && err.message ? err.message : err))}</div></div>`;
+    throw err;
+  }
 })();
